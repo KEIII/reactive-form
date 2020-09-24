@@ -79,7 +79,7 @@ export const formControl = <T>(
   ) => {
     const prev = state;
     state =
-      changes.value !== undefined
+      ('value' in changes || 'validators' in changes)
         ? setErr({ ...state, ...changes })
         : { ...state, ...changes };
     state$.next(state); // notify changes
