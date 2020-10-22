@@ -32,10 +32,7 @@ type PatchFn<T> = (
 
 export type FormControl<T> = {
   readonly state$: BehaviourSubject<FormControlState<T>>;
-  readonly state: FormControlState<T>;
-  readonly patch: PatchFn<T>;
-  readonly setValue: (value: T) => void;
-  readonly touch: () => void;
+  readonly change: PatchFn<T>;
   readonly addChangeListener: (f: StateChangeFn<T>) => void;
   readonly removeChangeListener: (f: StateChangeFn<T>) => void;
 };
@@ -73,7 +70,7 @@ export const formControl = <T>(
 
   const state$ = behaviourSubject(state);
 
-  const patch: PatchFn<T> = (
+  const change: PatchFn<T> = (
     changes: Partial<FormControlState<T>>,
     config = { emitEvent: false },
   ) => {
@@ -92,12 +89,7 @@ export const formControl = <T>(
 
   const control: FormControl<T> = {
     state$,
-    get state() {
-      return state;
-    },
-    patch,
-    setValue: value => patch({ dirty: true, value }, { emitEvent: true }),
-    touch: () => patch({ touched: true }, { emitEvent: true }),
+    change,
     addChangeListener: fn => (listeners = [...listeners, fn]),
     removeChangeListener: fn => (listeners = listeners.filter(i => i !== fn)),
   };

@@ -25,8 +25,11 @@ const InputString = ({
           type='text'
           disabled={state.disabled}
           value={state.value}
-          onChange={e => control.setValue(e.currentTarget.value)}
-          onBlur={() => control.touch()}
+          onChange={e => {
+            const value = e.currentTarget.value;
+            control.change({ dirty: true, value }, { emitEvent: true });
+          }}
+          onBlur={() => control.change({ touched: true }, { emitEvent: true })}
         />
         <pre>{JSON.stringify(state)}</pre>
       </label>
@@ -53,8 +56,11 @@ const InputNumber = ({
           type='number'
           disabled={state.disabled}
           value={Number.isFinite(state.value) ? state.value : ''}
-          onChange={e => control.setValue(e.currentTarget.valueAsNumber)}
-          onBlur={() => control.touch()}
+          onChange={e => {
+            const value = e.currentTarget.valueAsNumber;
+            control.change({ touched: true, dirty: true, value }, { emitEvent: true });
+          }}
+          onBlur={() => control.change({ touched: true }, { emitEvent: true })}
         />
         <pre>{JSON.stringify(state)}</pre>
       </label>
@@ -78,10 +84,10 @@ const InputBoolean = ({
           disabled={state.disabled}
           checked={state.value}
           onChange={e => {
-            control.touch();
-            control.setValue(e.currentTarget.checked);
+            const value = e.currentTarget.checked;
+            control.change({ touched: true, dirty: true, value }, { emitEvent: true });
           }}
-          onBlur={() => control.touch()}
+          onBlur={() => control.change({ touched: true }, { emitEvent: true })}
           style={{ marginRight: '0.35rem' }}
         />
         <strong>{label}</strong>
@@ -100,15 +106,27 @@ const App = () => {
     number: formControl({ value: NaN }),
     boolean: formControl({ value: false }),
   }), []);
-  const value = useBehaviourSubject(form.state$);
+  const formState = useBehaviourSubject(form.state$);
   return (
     <div>
       <InputString label='String' control={form.controls.string}/>
       <InputNumber label='Number' control={form.controls.number}/>
       <InputBoolean label='Boolean' control={form.controls.boolean}/>
       <div className={css.row}>
-        <strong>Form value</strong>
-        <pre>{JSON.stringify(value, null, 2)}</pre>
+        <button
+          onClick={() => {
+            form.change(
+              { disabled: !formState.disabled },
+              { emitEvent: true },
+            );
+          }}
+        >
+          Disable/Enable
+        </button>
+      </div>
+      <div className={css.row}>
+        <strong>Form state</strong>
+        <pre>{JSON.stringify(formState, null, 2)}</pre>
       </div>
     </div>
   );

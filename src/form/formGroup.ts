@@ -33,10 +33,8 @@ const intoFormState = <T>(
   let disabled = false;
   const errors: ValidationErrMap = {};
   const value: T = {} as unsafe; // eslint-disable-line
-  for (const {
-    key,
-    control: { state },
-  } of controlsArr) {
+  for (const { key, control } of controlsArr) {
+    const state = control.state$.value;
     value[key] = state.value;
     if (state.err !== null) {
       errors[key as string] = state.err;
@@ -83,18 +81,17 @@ export const formGroup = <T extends KeyValue<T>>(
 
   const group: FormGroup<T> = {
     state$: formState$,
-    get state() {
-      return formState;
+    change: (changes, config = { emitEvent: false }) => {
+      for (const [key, control] of Object.entries(controls) as [keyof T, FormControl<T>][]) {
+        const _changes = {} as unsafe;
+        if (changes.value !== undefined) _changes.value = changes.value[key];
+        if (changes.dirty !== undefined) _changes.dirty = changes.dirty;
+        if (changes.touched !== undefined) _changes.touched = changes.touched;
+        if (changes.disabled !== undefined) _changes.disabled = changes.disabled;
+        control.change(_changes, { emitEvent: false });
+      }
+      if (config.emitEvent) changeListener();
     },
-    patch: () => {
-      throw new Error('Disabled `patch` on group!');
-    },
-    setValue: (value: T) => {
-      (Object.keys(value) as (keyof T)[]).forEach(key => {
-        controls[key]?.setValue(value[key]);
-      });
-    },
-    touch: () => controlsArr.forEach(i => i.control.touch()),
     addChangeListener: fn => (listeners = [...listeners, fn]),
     removeChangeListener: fn => (listeners = listeners.filter(i => i !== fn)),
     controls,
