@@ -1,98 +1,66 @@
-import { BehaviourSubject, behaviourSubject } from './behaviourSubject';
+import { BehaviourSubject, behaviourSubject } from './utils/behaviourSubject';
+import * as D from 'io-ts/Decoder';
+import * as E from 'fp-ts/lib/Either';
 
-export type ValidationErr = string;
-
-export type ValidationErrMap = {
-  [k: string]: ValidationErr | ValidationErrMap;
-};
-
-export type ControlErr = ValidationErr | ValidationErrMap;
-
-export type Validator<T> = (value: T) => ValidationErr | null;
-
-export type FormControlState<T> = {
+export type State<T> = {
   readonly dirty: boolean;
   readonly disabled: boolean;
-  readonly err: ControlErr | null;
   readonly touched: boolean;
-  readonly validators?: Validator<T>[];
-  readonly value: T;
+  readonly rawValue: unknown;
+  readonly decoder: D.Decoder<unknown, T>;
+  readonly value: E.Either<D.DecodeError, T>;
+  readonly onChange?: OnChangeFn<T>;
 };
 
-export type StateChangeFn<T> = (
-  prev: FormControlState<T>,
-  curr: FormControlState<T>,
-  control: FormControl<T>,
-) => void;
+export type InitState<T> = Partial<Omit<State<T>, 'decoder'>> &
+  Pick<State<T>, 'decoder'>;
 
-type PatchFn<T> = (
-  patch: Partial<FormControlState<T>>,
+export type StateChanges<T> = Partial<Omit<State<T>, 'value'>>;
+
+export type OnChangeFn<T> = (prev: State<T>, curr: State<T>) => void;
+
+type ChangeStateFn<T> = (
+  patch: StateChanges<T>,
   config?: { emitEvent: boolean },
 ) => void;
 
 export type FormControl<T> = {
-  readonly state$: BehaviourSubject<FormControlState<T>>;
-  readonly change: PatchFn<T>;
-  readonly addChangeListener: (f: StateChangeFn<T>) => void;
-  readonly removeChangeListener: (f: StateChangeFn<T>) => void;
+  readonly state$: BehaviourSubject<State<T>>;
+  readonly change: ChangeStateFn<T>;
 };
 
-const getErr = <T>(
-  value: T,
-  validators: Validator<T>[],
-): ValidationErr | null => {
-  let err: ValidationErr | null = null;
-  for (const validator of validators) {
-    err = validator(value);
-    if (err !== null) return err;
+const withChanges = <T>(
+  state: State<T>,
+  changes: StateChanges<T>,
+): State<T> => {
+  if (!('rawValue' in changes || 'decoder' in changes)) {
+    return { ...state, ...changes };
   }
-  return null;
+  const decoder = changes.decoder ?? state.decoder;
+  const rawValue = changes.rawValue ?? state.rawValue;
+  const value = decoder.decode(rawValue);
+  return { ...state, decoder, rawValue, value };
 };
 
-const setErr = <T>(state: FormControlState<T>): FormControlState<T> => {
-  if (state.validators === undefined) return state;
-  return { ...state, err: getErr(state.value, state.validators) };
-};
+export const formControl = <T>(initState: InitState<T>): FormControl<T> => {
+  const state$ = behaviourSubject<State<T>>({
+    dirty: initState.dirty ?? false,
+    disabled: initState.disabled ?? false,
+    touched: initState.touched ?? false,
+    rawValue: initState.rawValue,
+    decoder: initState.decoder,
+    value: initState.decoder.decode(initState.rawValue),
+    onChange: initState.onChange,
+  });
 
-export const formControl = <T>(
-  s: Partial<FormControlState<T>> & { value: T },
-  onChange?: StateChangeFn<T>,
-): FormControl<T> => {
-  let listeners: StateChangeFn<T>[] = onChange !== undefined ? [onChange] : [];
-  let state: FormControlState<T> = {
-    dirty: s.dirty ?? false,
-    disabled: s.disabled ?? false,
-    err: s.err ?? getErr(s.value, s.validators ?? []),
-    touched: s.touched ?? false,
-    validators: s.validators,
-    value: s.value,
-  };
-
-  const state$ = behaviourSubject(state);
-
-  const change: PatchFn<T> = (
-    changes: Partial<FormControlState<T>>,
-    config = { emitEvent: false },
-  ) => {
-    const prev = state;
-    state =
-      ('value' in changes || 'validators' in changes)
-        ? setErr({ ...state, ...changes })
-        : { ...state, ...changes };
-    state$.next(state); // notify changes
+  const change: ChangeStateFn<T> = (changes, config = { emitEvent: false }) => {
+    const prev = state$.value;
+    const nextState = withChanges(prev, changes);
+    state$.next(nextState); // notify changes
     if (config.emitEvent) {
-      for (const fn of listeners) {
-        fn(prev, state, control);
-      }
+      nextState.onChange?.(prev, nextState);
     }
   };
 
-  const control: FormControl<T> = {
-    state$,
-    change,
-    addChangeListener: fn => (listeners = [...listeners, fn]),
-    removeChangeListener: fn => (listeners = listeners.filter(i => i !== fn)),
-  };
-
-  return control;
+  return { state$, change };
 };

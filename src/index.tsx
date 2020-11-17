@@ -1,10 +1,9 @@
 import React, { useMemo } from 'react';
 import ReactDOM from 'react-dom';
 import css from './style.module.css';
-import { formGroup } from './form/formGroup';
 import { FormControl, formControl } from './form/formControl';
-import { useBehaviourSubject } from './form/useBehaviourSubject';
-import { requiredStr } from './form/validators';
+import { useBehaviourSubject } from './form/utils/useBehaviourSubject';
+import * as D from 'io-ts/Decoder';
 
 const InputString = ({
   label,
@@ -14,20 +13,32 @@ const InputString = ({
   control: FormControl<string>;
 }) => {
   const state = useBehaviourSubject(control.state$);
+  const err = ((): string | null => {
+    if (state.value._tag === 'Left') {
+      if (state.value.left._tag === 'Of') {
+        if (state.value.left.value._tag === 'Leaf') {
+          return state.value.left.value.error;
+        }
+      }
+    }
+    return null;
+  })();
   return (
     <div className={css.row}>
       <label>
         <div>
           <strong>{label}</strong>
-          {state.err && <span style={{ color: 'red', marginLeft: '0.25rem' }}>{state.err}</span>}
+          {err && (
+            <span style={{ color: 'red', marginLeft: '0.25rem' }}>{err}</span>
+          )}
         </div>
         <input
           type='text'
           disabled={state.disabled}
-          value={state.value}
-          onChange={e => {
-            const value = e.currentTarget.value;
-            control.change({ dirty: true, value }, { emitEvent: true });
+          value={typeof state.rawValue === 'number' ? state.rawValue : ''}
+          onChange={event => {
+            const rawValue = Number(event.currentTarget.value);
+            control.change({ dirty: true, rawValue }, { emitEvent: true });
           }}
           onBlur={() => control.change({ touched: true }, { emitEvent: true })}
         />
@@ -37,99 +48,31 @@ const InputString = ({
   );
 };
 
-const InputNumber = ({
-  label,
-  control,
-}: {
-  label: string;
-  control: FormControl<number>;
-}) => {
-  const state = useBehaviourSubject(control.state$);
-  return (
-    <div className={css.row}>
-      <label>
-        <div>
-          <strong>{label}</strong>
-          {state.err && <span style={{ color: 'red', marginLeft: '0.25rem' }}>{state.err}</span>}
-        </div>
-        <input
-          type='number'
-          disabled={state.disabled}
-          value={Number.isFinite(state.value) ? state.value : ''}
-          onChange={e => {
-            const value = e.currentTarget.valueAsNumber;
-            control.change({ touched: true, dirty: true, value }, { emitEvent: true });
-          }}
-          onBlur={() => control.change({ touched: true }, { emitEvent: true })}
-        />
-        <pre>{JSON.stringify(state)}</pre>
-      </label>
-    </div>
-  );
-};
-
-const InputBoolean = ({
-  label,
-  control,
-}: {
-  label: string;
-  control: FormControl<boolean>;
-}) => {
-  const state = useBehaviourSubject(control.state$);
-  return (
-    <div className={css.row}>
-      <label style={{ display: 'flex', alignItems: 'center' }}>
-        <input
-          type='checkbox'
-          disabled={state.disabled}
-          checked={state.value}
-          onChange={e => {
-            const value = e.currentTarget.checked;
-            control.change({ touched: true, dirty: true, value }, { emitEvent: true });
-          }}
-          onBlur={() => control.change({ touched: true }, { emitEvent: true })}
-          style={{ marginRight: '0.35rem' }}
-        />
-        <strong>{label}</strong>
-      </label>
-      <div>
-        {state.err && <span style={{ color: 'red', marginLeft: '0.25rem' }}>{state.err}</span>}
-      </div>
-      <pre>{JSON.stringify(state)}</pre>
-    </div>
-  );
+const testString: D.Decoder<unknown, string> = {
+  decode: (value: unknown) => {
+    return typeof value === 'string' && value === 'test'
+      ? D.success(value)
+      : D.failure(value, 'Value no "test" string');
+  },
 };
 
 const App = () => {
-  const form = useMemo(() => formGroup({
-    string: formControl({ value: '', validators: [requiredStr] }),
-    number: formControl({ value: NaN }),
-    boolean: formControl({ value: false }),
-  }), []);
-  const formState = useBehaviourSubject(form.state$);
+  const control = useMemo(() => {
+    return formControl({
+      decoder: testString,
+      rawValue: 7,
+    });
+  }, []);
+  const controlState = useBehaviourSubject(control.state$);
   return (
     <div>
-      <InputString label='String' control={form.controls.string}/>
-      <InputNumber label='Number' control={form.controls.number}/>
-      <InputBoolean label='Boolean' control={form.controls.boolean}/>
-      <div className={css.row}>
-        <button
-          onClick={() => {
-            form.change(
-              { disabled: !formState.disabled },
-              { emitEvent: true },
-            );
-          }}
-        >
-          Disable/Enable
-        </button>
-      </div>
+      <InputString label='String' control={control} />
       <div className={css.row}>
         <strong>Form state</strong>
-        <pre>{JSON.stringify(formState, null, 2)}</pre>
+        <pre>{JSON.stringify(controlState, null, 2)}</pre>
       </div>
     </div>
   );
 };
 
-ReactDOM.render(<App/>, document.getElementById('root'));
+ReactDOM.render(<App />, document.getElementById('root'));
