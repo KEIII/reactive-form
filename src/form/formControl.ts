@@ -1,19 +1,25 @@
 import { BehaviourSubject, behaviourSubject } from './utils/behaviourSubject';
-import * as D from 'io-ts/Decoder';
-import * as E from 'fp-ts/lib/Either';
+
+type Either<A, B> = { _tag: 'Left'; left: A } | { _tag: 'Right'; right: B };
+
+type DecodeError = string;
+
+type Value<T> = Either<DecodeError, T>;
+
+export type Decode<T> = (value: unknown) => Value<T>;
 
 export type State<T> = {
   readonly dirty: boolean;
   readonly disabled: boolean;
   readonly touched: boolean;
   readonly rawValue: unknown;
-  readonly decoder: D.Decoder<unknown, T>;
-  readonly value: E.Either<D.DecodeError, T>;
+  readonly decode: Decode<T>;
+  readonly value: Value<T>;
   readonly onChange?: OnChangeFn<T>;
 };
 
-export type InitState<T> = Partial<Omit<State<T>, 'decoder'>> &
-  Pick<State<T>, 'decoder'>;
+export type InitState<T> = Partial<Omit<State<T>, 'decode'>> &
+  Pick<State<T>, 'decode'>;
 
 export type StateChanges<T> = Partial<Omit<State<T>, 'value'>>;
 
@@ -33,13 +39,13 @@ const withChanges = <T>(
   state: State<T>,
   changes: StateChanges<T>,
 ): State<T> => {
-  if (!('rawValue' in changes || 'decoder' in changes)) {
+  if (!('rawValue' in changes || 'decode' in changes)) {
     return { ...state, ...changes };
   }
-  const decoder = changes.decoder ?? state.decoder;
+  const decode = changes.decode ?? state.decode;
   const rawValue = changes.rawValue ?? state.rawValue;
-  const value = decoder.decode(rawValue);
-  return { ...state, decoder, rawValue, value };
+  const value = decode(rawValue);
+  return { ...state, decode, rawValue, value };
 };
 
 export const formControl = <T>(initState: InitState<T>): FormControl<T> => {
@@ -48,8 +54,8 @@ export const formControl = <T>(initState: InitState<T>): FormControl<T> => {
     disabled: initState.disabled ?? false,
     touched: initState.touched ?? false,
     rawValue: initState.rawValue,
-    decoder: initState.decoder,
-    value: initState.decoder.decode(initState.rawValue),
+    decode: initState.decode,
+    value: initState.decode(initState.rawValue),
     onChange: initState.onChange,
   });
 
