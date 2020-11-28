@@ -15,7 +15,7 @@ export type State<T> = {
   readonly rawValue: unknown;
   readonly decode: Decode<T>;
   readonly value: Value<T>;
-  readonly onChange?: OnChangeFn<T>;
+  readonly onChange?: OnChangeFn<T>[];
 };
 
 export type InitState<T> = Partial<Omit<State<T>, 'decode'>> &
@@ -64,7 +64,7 @@ export const formControl = <T>(initState: InitState<T>): FormControl<T> => {
     const nextState = withChanges(prev, changes);
     state$.next(nextState); // notify changes
     if (config.emitEvent) {
-      nextState.onChange?.(prev, nextState);
+      nextState.onChange?.forEach(f => f(prev, nextState));
     }
   };
 

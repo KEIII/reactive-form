@@ -11,26 +11,30 @@ import {
   intoString,
   required,
 } from './inputs';
+import { formGroup } from './form/formGroup';
 
 const App = () => {
-  const controls = useMemo(() => {
-    return {
+  const group = useMemo(() => {
+    return formGroup({
       str: formControl({ decode: intoString }),
       requiredStr: formControl({ decode: required(intoString) }),
       email: formControl({ decode: intoEmail }),
       num: formControl({ decode: intoNumber, rawValue: 7 }),
-    };
+    });
   }, []);
-  const controlState = useBehaviourSubject(controls.num.state$);
+  const state = useBehaviourSubject(group.state$);
   return (
     <div>
-      <InputString label='String' control={controls.str} />
-      <InputString label='Required String' control={controls.requiredStr} />
-      <InputString label='Email' type='email' control={controls.email} />
-      <InputNumber label='Number' control={controls.num} />
+      <InputString label='String' control={group.controls.str} />
+      <InputString
+        label='Required String'
+        control={group.controls.requiredStr}
+      />
+      <InputString label='Email' type='email' control={group.controls.email} />
+      <InputNumber label='Number' control={group.controls.num} />
       <div className={css.row}>
         <strong>Form state</strong>
-        <pre>{JSON.stringify(controlState, null, 2)}</pre>
+        <pre>{JSON.stringify(state, null, 2)}</pre>
       </div>
     </div>
   );

@@ -70,7 +70,6 @@ const BaseInput = function <T>({
           }}
           onBlur={() => control.change({ touched: true }, { emitEvent: true })}
         />
-        <pre>{JSON.stringify(state)}</pre>
       </label>
     </div>
   );
