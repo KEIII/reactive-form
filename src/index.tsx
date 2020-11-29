@@ -24,25 +24,39 @@ const PrintStreamValue = function <T>({
 };
 
 const App = () => {
-  const group = useMemo(() => {
-    return formGroup({
-      fg: formGroup({
-        str: formControl({ decode: intoString }),
-        requiredStr: formControl({ decode: required(intoString) }),
-      }),
+  const { group, controls, subControls } = useMemo(() => {
+    const subControls = {
+      str: formControl({ decode: intoString }),
+      requiredStr: formControl({ decode: required(intoString) }),
+    };
+    const controls = {
+      sub: formGroup(subControls),
       email: formControl({ decode: intoEmail }),
       num: formControl({ decode: intoNumber, rawValue: 7 }),
-    });
+    };
+    return { group: formGroup(controls), controls, subControls };
   }, []);
   return (
     <div>
-      <InputString label='String' control={group.controls.fg.controls!.str} />
-      <InputString
-        label='Required String'
-        control={group.controls.fg.controls!.requiredStr}
-      />
-      <InputString label='Email' type='email' control={group.controls.email} />
-      <InputNumber label='Number' control={group.controls.num} />
+      <button
+        onClick={() => {
+          group.change(
+            {
+              rawValue: {
+                sub: { str: 'str', requiredStr: 'req' },
+                email: 'email',
+              },
+            },
+            { emitEvent: true },
+          );
+        }}
+      >
+        Set data
+      </button>
+      <InputString label='String' control={subControls.str} />
+      <InputString label='Required String' control={subControls.requiredStr} />
+      <InputString label='Email' type='email' control={controls.email} />
+      <InputNumber label='Number' control={controls.num} />
       <div className={css.row}>
         <strong>Form state</strong>
         <PrintStreamValue stream={group.state$} />

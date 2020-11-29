@@ -4,34 +4,23 @@ import { isLeft, left, right } from './utils/either';
 
 type unsafe = any; // eslint-disable-line @typescript-eslint/no-explicit-any
 
-export type KeyValue<T> = { [P in keyof T]: T[P] };
+type KeyValue<T> = { [P in keyof T]: T[P] };
 
-export type FormControls<T> = {
-  [P in keyof T]: FormControl<T[P]> & { controls?: FormControls<T[P]> }; // todo: find better way to replace optional `controls`
-};
+type KeyControl<T> = [keyof T, FormControl<T[keyof T]>];
 
-export type FormGroup<T> = FormControl<T> & {
-  readonly controls: FormControls<T>;
-};
-
-type ControlItem<T, K extends keyof T = keyof T> = {
-  key: K;
-  control: FormControl<T[K]>;
-};
-
-const intoFormState = <T>(controlsArr: ControlItem<T>[]): State<T> => {
+const intoFormState = <T>(controlsAsArray: KeyControl<T>[]): State<T> => {
   let touched = false;
   let dirty = false;
-  let disabled = false;
+  let disabled = true;
   const errors: { [k: string]: DecodeError } = {};
   const rawValue = {} as unsafe;
-  for (const { key, control } of controlsArr) {
+  for (const [key, control] of controlsAsArray) {
     const state = control.state$.value;
     rawValue[key] = state.rawValue;
     if (isLeft(state.value)) {
       errors[key as string] = state.value.left;
     }
-    if (state.disabled) disabled = true;
+    if (!state.disabled) disabled = false;
     if (state.dirty) dirty = true;
     if (state.touched) touched = true;
   }
@@ -48,8 +37,8 @@ const intoFormState = <T>(controlsArr: ControlItem<T>[]): State<T> => {
 };
 
 export const formGroup = <T extends KeyValue<T>>(
-  controls: FormControls<T>,
-): FormGroup<T> => {
+  controls: { [P in keyof T]: FormControl<T[P]> },
+): FormControl<T> => {
   const changeListener = () => {
     const prevState = formState;
     formState = intoFormState(controlsAsArray);
@@ -58,10 +47,10 @@ export const formGroup = <T extends KeyValue<T>>(
   };
 
   const controlsAsArray = (() => {
-    const arr: ControlItem<T>[] = [];
+    const arr: KeyControl<T>[] = [];
     type I = [keyof T, FormControl<T[keyof T]>];
     for (const [key, control] of Object.entries(controls) as I[]) {
-      arr.push({ key, control });
+      arr.push([key, control]);
       control.addChangeListener(changeListener);
     }
     return arr;
@@ -74,35 +63,29 @@ export const formGroup = <T extends KeyValue<T>>(
   return {
     state$: formState$,
     change: (groupChanges, config = { emitEvent: false }) => {
-      type I = [keyof T, FormControl<T>];
-      for (const [key, control] of Object.entries(controls) as I[]) {
+      const raw = (() => {
+        type R = Record<keyof T, unknown>;
+        const raw = groupChanges.rawValue;
+        return typeof raw === 'object' && raw !== null ? (raw as R) : ({} as R);
+      })();
+      for (const [key, control] of controlsAsArray) {
         const controlChanges = {} as unsafe;
-        {
-          const raw = groupChanges.rawValue;
-          if (
-            'rawValue' in groupChanges &&
-            typeof raw === 'object' &&
-            raw !== null &&
-            key in raw
-          ) {
-            type R = Record<keyof T, unknown>;
-            controlChanges.rawValue = (raw as R)[key];
-          }
+        if (key in raw) {
+          controlChanges.rawValue = raw[key];
         }
-        if ('dirty' in groupChanges) {
+        if (groupChanges.dirty !== undefined) {
           controlChanges.dirty = groupChanges.dirty;
         }
-        if ('touched' in groupChanges) {
+        if (groupChanges.touched !== undefined) {
           controlChanges.touched = groupChanges.touched;
         }
-        if ('disabled' in groupChanges) {
+        if (groupChanges.disabled !== undefined) {
           controlChanges.disabled = groupChanges.disabled;
         }
-        control.change(controlChanges, { emitEvent: false });
+        control.change(controlChanges, config);
       }
       if (config.emitEvent) changeListener();
     },
-    controls,
     addChangeListener: f => (listeners = [...listeners, f]),
     removeChangeListener: f => (listeners = listeners.filter(i => i !== f)),
   };
