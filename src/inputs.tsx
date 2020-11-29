@@ -54,7 +54,7 @@ const BaseInput = function <T>({
       <label>
         <div>
           <strong>{label}</strong>
-          {isLeft(value) && (
+          {state.touched && isLeft(value) && (
             <span style={{ color: 'red', marginLeft: '0.25rem' }}>
               {fmtDecodeError(value.left)}
             </span>

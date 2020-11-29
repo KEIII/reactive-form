@@ -53,6 +53,11 @@ const App = () => {
       >
         Set data
       </button>
+      <button
+        onClick={() => group.change({ touched: true }, { emitEvent: true })}
+      >
+        Touch
+      </button>
       <InputString label='String' control={subControls.str} />
       <InputString label='Required String' control={subControls.requiredStr} />
       <InputString label='Email' type='email' control={controls.email} />
