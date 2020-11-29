@@ -1,33 +1,32 @@
-import * as t from 'io-ts';
-import * as E from 'fp-ts/Either';
 import { Decode, FormControl } from './form/formControl';
 import { useBehaviourSubject } from './form/utils/useBehaviourSubject';
 import css from './style.module.css';
 import { ChangeEvent } from 'react';
 import { fmtDecodeError } from './form/fmtDecodeError';
-import { isLeft } from './form/utils/either';
+import { isLeft, left, right } from './form/utils/either';
 
 export const intoNumber = (v: unknown) => {
-  const d = t.number.asDecoder().decode(v);
-  return E.mapLeft(() => 'Not a number')(d);
+  return typeof v === 'number' && Number.isFinite(v)
+    ? right(v)
+    : left('Invalid number');
 };
 
 export const intoString = (v: unknown) => {
   v = v ?? '';
-  return typeof v === 'string' ? E.right(v) : E.left('Not a string');
+  return typeof v === 'string' ? right(v) : left('Not a string');
 };
 
 export const required = function <T>(d: Decode<T>): Decode<T> {
   return v => {
-    if (!(typeof v === 'string' ? v.trim() : v)) return E.left('Required');
+    if (!(typeof v === 'string' ? v.trim() : v)) return left('Required');
     return d(v);
   };
 };
 
 export const intoEmail = (v: unknown) => {
   return typeof v === 'string' && v.includes('@')
-    ? E.right(v)
-    : E.left('Not a email');
+    ? right(v)
+    : left('Not a email');
 };
 
 type Props<T> = {
