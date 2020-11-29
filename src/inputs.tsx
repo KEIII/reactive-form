@@ -5,6 +5,7 @@ import { useBehaviourSubject } from './form/utils/useBehaviourSubject';
 import css from './style.module.css';
 import { ChangeEvent } from 'react';
 import { fmtDecodeError } from './form/fmtDecodeError';
+import { isLeft } from './form/utils/either';
 
 export const intoNumber = (v: unknown) => {
   const d = t.number.asDecoder().decode(v);
@@ -53,7 +54,7 @@ const BaseInput = function <T>({
       <label>
         <div>
           <strong>{label}</strong>
-          {value._tag === 'Left' && (
+          {isLeft(value) && (
             <span style={{ color: 'red', marginLeft: '0.25rem' }}>
               {fmtDecodeError(value.left)}
             </span>

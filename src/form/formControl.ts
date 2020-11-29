@@ -1,8 +1,5 @@
 import { BehaviourSubject, behaviourSubject } from './utils/behaviourSubject';
-
-export type Either<A, B> =
-  | { _tag: 'Left'; left: A }
-  | { _tag: 'Right'; right: B };
+import { Either } from './utils/either';
 
 export type DecodeError = string | { [k: string]: DecodeError }; // todo: find a way for better errors type
 

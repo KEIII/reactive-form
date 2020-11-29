@@ -1,5 +1,6 @@
 import { behaviourSubject } from './utils/behaviourSubject';
 import { ChangeListener, DecodeError, FormControl, State } from './formControl';
+import { isLeft, left, right } from './utils/either';
 
 type unsafe = any; // eslint-disable-line @typescript-eslint/no-explicit-any
 
@@ -27,7 +28,7 @@ const intoFormState = <T>(controlsArr: ControlItem<T>[]): State<T> => {
   for (const { key, control } of controlsArr) {
     const state = control.state$.value;
     rawValue[key] = state.rawValue;
-    if (state.value._tag === 'Left') {
+    if (isLeft(state.value)) {
       errors[key as string] = state.value.left;
     }
     if (state.disabled) disabled = true;
@@ -42,10 +43,7 @@ const intoFormState = <T>(controlsArr: ControlItem<T>[]): State<T> => {
     decode: () => {
       throw new Error('not implemented');
     },
-    value:
-      Object.keys(errors).length > 0
-        ? { _tag: 'Left', left: errors }
-        : { _tag: 'Right', right: rawValue },
+    value: Object.keys(errors).length > 0 ? left(errors) : right(rawValue),
   };
 };
 
