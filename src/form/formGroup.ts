@@ -23,12 +23,11 @@ const intoFormState = <T>(controlsArr: ControlItem<T>[]): State<T> => {
   let dirty = false;
   let disabled = false;
   const errors: { [k: string]: DecodeError } = {};
-  const value: T = {} as unsafe;
+  const rawValue = {} as unsafe;
   for (const { key, control } of controlsArr) {
     const state = control.state$.value;
-    if (state.value._tag === 'Right') {
-      value[key] = state.value.right;
-    } else {
+    rawValue[key] = state.rawValue;
+    if (state.value._tag === 'Left') {
       errors[key as string] = state.value.left;
     }
     if (state.disabled) disabled = true;
@@ -39,14 +38,14 @@ const intoFormState = <T>(controlsArr: ControlItem<T>[]): State<T> => {
     dirty,
     disabled,
     touched,
-    rawValue: value,
+    rawValue,
     decode: () => {
       throw new Error('not implemented');
     },
     value:
       Object.keys(errors).length > 0
         ? { _tag: 'Left', left: errors }
-        : { _tag: 'Right', right: value },
+        : { _tag: 'Right', right: rawValue },
   };
 };
 
@@ -76,23 +75,32 @@ export const formGroup = <T extends KeyValue<T>>(
 
   return {
     state$: formState$,
-    change: (changes, config = { emitEvent: false }) => {
+    change: (groupChanges, config = { emitEvent: false }) => {
       type I = [keyof T, FormControl<T>];
       for (const [key, control] of Object.entries(controls) as I[]) {
-        const _changes = {} as unsafe;
-        if ('rawValue' in changes) {
-          _changes.rawValue = (changes.rawValue as unsafe)[key]; // todo: fixme unsafe
+        const controlChanges = {} as unsafe;
+        {
+          const raw = groupChanges.rawValue;
+          if (
+            'rawValue' in groupChanges &&
+            typeof raw === 'object' &&
+            raw !== null &&
+            key in raw
+          ) {
+            type R = Record<keyof T, unknown>;
+            controlChanges.rawValue = (raw as R)[key];
+          }
         }
-        if ('dirty' in changes) {
-          _changes.dirty = changes.dirty;
+        if ('dirty' in groupChanges) {
+          controlChanges.dirty = groupChanges.dirty;
         }
-        if ('touched' in changes) {
-          _changes.touched = changes.touched;
+        if ('touched' in groupChanges) {
+          controlChanges.touched = groupChanges.touched;
         }
-        if ('disabled' in changes) {
-          _changes.disabled = changes.disabled;
+        if ('disabled' in groupChanges) {
+          controlChanges.disabled = groupChanges.disabled;
         }
-        control.change(_changes, { emitEvent: false });
+        control.change(controlChanges, { emitEvent: false });
       }
       if (config.emitEvent) changeListener();
     },
