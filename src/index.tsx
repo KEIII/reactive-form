@@ -13,6 +13,8 @@ import {
 } from './inputs';
 import { formGroup } from './form/formGroup';
 import { BehaviourSubject } from './form/utils/behaviourSubject';
+import { isRight } from './form/utils/either';
+import { fmtDecodeError } from './form/fmtDecodeError';
 
 const PrintStreamValue = function <T>({
   stream,
@@ -38,26 +40,41 @@ const App = () => {
   }, []);
   return (
     <div>
-      <button
-        onClick={() => {
-          group.change(
-            {
-              rawValue: {
-                sub: { str: 'str', requiredStr: 'req' },
-                email: 'email',
+      <div>
+        <button
+          onClick={() => {
+            group.change(
+              {
+                rawValue: {
+                  sub: { str: 'str', requiredStr: 'req' },
+                  email: 'email',
+                },
               },
-            },
-            { emitEvent: true },
-          );
-        }}
-      >
-        Set data
-      </button>
-      <button
-        onClick={() => group.change({ touched: true }, { emitEvent: true })}
-      >
-        Touch
-      </button>
+              { emitEvent: true },
+            );
+          }}
+        >
+          Set data
+        </button>
+        <button
+          onClick={() => group.change({ touched: true }, { emitEvent: true })}
+        >
+          Touch
+        </button>
+        <button
+          onClick={() => {
+            const v = group.state$.value.value;
+            if (isRight(v)) {
+              console.log(v.right);
+            } else {
+              console.log(fmtDecodeError(v.left));
+              group.change({ touched: true }, { emitEvent: true });
+            }
+          }}
+        >
+          Log Value
+        </button>
+      </div>
       <InputString label='String' control={subControls.str} />
       <InputString label='Required String' control={subControls.requiredStr} />
       <InputString label='Email' type='email' control={controls.email} />
