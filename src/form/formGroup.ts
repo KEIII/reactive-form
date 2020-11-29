@@ -1,6 +1,5 @@
 import { behaviourSubject } from './utils/behaviourSubject';
-import { FormControl, State } from './formControl';
-import { formatErr, ValidationErrors } from './formatErr';
+import { DecodeError, FormControl, State } from './formControl';
 
 type unsafe = any; // eslint-disable-line @typescript-eslint/no-explicit-any
 
@@ -23,14 +22,14 @@ const intoFormState = <T>(controlsArr: ControlItem<T>[]): State<T> => {
   let touched = false;
   let dirty = false;
   let disabled = false;
-  const errors: ValidationErrors = [];
+  const errors: { [k: string]: DecodeError } = {};
   const value: T = {} as unsafe;
   for (const { key, control } of controlsArr) {
     const state = control.state$.value;
     if (state.value._tag === 'Right') {
       value[key] = state.value.right;
     } else {
-      errors.push({ key: key as string, value: state.value.left });
+      errors[key as string] = state.value.left;
     }
     if (state.disabled) disabled = true;
     if (state.dirty) dirty = true;
@@ -45,8 +44,8 @@ const intoFormState = <T>(controlsArr: ControlItem<T>[]): State<T> => {
       throw new Error('not implemented');
     },
     value:
-      errors.length > 0
-        ? { _tag: 'Left', left: formatErr(errors) }
+      Object.keys(errors).length > 0
+        ? { _tag: 'Left', left: errors }
         : { _tag: 'Right', right: value },
   };
 };

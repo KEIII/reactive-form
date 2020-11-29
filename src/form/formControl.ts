@@ -1,10 +1,12 @@
 import { BehaviourSubject, behaviourSubject } from './utils/behaviourSubject';
 
-type Either<A, B> = { _tag: 'Left'; left: A } | { _tag: 'Right'; right: B };
+export type Either<A, B> =
+  | { _tag: 'Left'; left: A }
+  | { _tag: 'Right'; right: B };
 
-type DecodeError = string;
+export type DecodeError = string | { [k: string]: DecodeError }; // todo: find a way for better errors type
 
-type Value<T> = Either<DecodeError, T>;
+export type Value<T> = Either<DecodeError, T>;
 
 export type Decode<T> = (value: unknown) => Value<T>;
 

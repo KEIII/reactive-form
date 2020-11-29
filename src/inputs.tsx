@@ -4,6 +4,7 @@ import { Decode, FormControl } from './form/formControl';
 import { useBehaviourSubject } from './form/utils/useBehaviourSubject';
 import css from './style.module.css';
 import { ChangeEvent } from 'react';
+import { fmtDecodeError } from './form/fmtDecodeError';
 
 export const intoNumber = (v: unknown) => {
   const d = t.number.asDecoder().decode(v);
@@ -54,7 +55,7 @@ const BaseInput = function <T>({
           <strong>{label}</strong>
           {value._tag === 'Left' && (
             <span style={{ color: 'red', marginLeft: '0.25rem' }}>
-              {value.left}
+              {fmtDecodeError(value.left)}
             </span>
           )}
         </div>
