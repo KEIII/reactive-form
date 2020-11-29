@@ -17,7 +17,6 @@ export type State<T> = {
   readonly rawValue: unknown;
   readonly decode: Decode<T>;
   readonly value: Value<T>;
-  readonly onChange?: OnChangeFn<T>[];
 };
 
 export type InitState<T> = Partial<Omit<State<T>, 'decode'>> &
@@ -25,32 +24,37 @@ export type InitState<T> = Partial<Omit<State<T>, 'decode'>> &
 
 export type StateChanges<T> = Partial<Omit<State<T>, 'value'>>;
 
-export type OnChangeFn<T> = (prev: State<T>, curr: State<T>) => void;
+export type ChangeListener<T> = (prev: State<T>, curr: State<T>) => void;
 
-type ChangeStateFn<T> = (
+type ChangeState<T> = (
   patch: StateChanges<T>,
   config?: { emitEvent: boolean },
 ) => void;
 
 export type FormControl<T> = {
   readonly state$: BehaviourSubject<State<T>>;
-  readonly change: ChangeStateFn<T>;
+  readonly change: ChangeState<T>;
+  readonly addChangeListener: (f: ChangeListener<T>) => void;
+  readonly removeChangeListener: (f: ChangeListener<T>) => void;
 };
 
 const withChanges = <T>(
   state: State<T>,
   changes: StateChanges<T>,
 ): State<T> => {
-  if (!('rawValue' in changes || 'decode' in changes)) {
+  if ('rawValue' in changes || 'decode' in changes) {
+    const decode = changes.decode ?? state.decode;
+    const rawValue = changes.rawValue ?? state.rawValue;
+    const value = decode(rawValue);
+    return { ...state, decode, rawValue, value };
+  } else {
     return { ...state, ...changes };
   }
-  const decode = changes.decode ?? state.decode;
-  const rawValue = changes.rawValue ?? state.rawValue;
-  const value = decode(rawValue);
-  return { ...state, decode, rawValue, value };
 };
 
 export const formControl = <T>(initState: InitState<T>): FormControl<T> => {
+  let listeners: ChangeListener<T>[] = [];
+
   const state$ = behaviourSubject<State<T>>({
     dirty: initState.dirty ?? false,
     disabled: initState.disabled ?? false,
@@ -58,17 +62,21 @@ export const formControl = <T>(initState: InitState<T>): FormControl<T> => {
     rawValue: initState.rawValue,
     decode: initState.decode,
     value: initState.decode(initState.rawValue),
-    onChange: initState.onChange,
   });
 
-  const change: ChangeStateFn<T> = (changes, config = { emitEvent: false }) => {
-    const prev = state$.value;
-    const nextState = withChanges(prev, changes);
+  const change: ChangeState<T> = (changes, config = { emitEvent: false }) => {
+    const prevState = state$.value;
+    const nextState = withChanges(prevState, changes);
     state$.next(nextState); // notify changes
     if (config.emitEvent) {
-      nextState.onChange?.forEach(f => f(prev, nextState));
+      listeners.forEach(f => f(prevState, nextState));
     }
   };
 
-  return { state$, change };
+  return {
+    state$,
+    change,
+    addChangeListener: f => (listeners = [...listeners, f]),
+    removeChangeListener: f => (listeners = listeners.filter(i => i !== f)),
+  };
 };

@@ -1,12 +1,12 @@
 import { behaviourSubject } from './utils/behaviourSubject';
-import { DecodeError, FormControl, State } from './formControl';
+import { ChangeListener, DecodeError, FormControl, State } from './formControl';
 
 type unsafe = any; // eslint-disable-line @typescript-eslint/no-explicit-any
 
 export type KeyValue<T> = { [P in keyof T]: T[P] };
 
 export type FormControls<T> = {
-  [P in keyof T]: FormControl<T[P]> & { controls?: FormControls<T[P]> };
+  [P in keyof T]: FormControl<T[P]> & { controls?: FormControls<T[P]> }; // todo: find better way to replace optional `controls`
 };
 
 export type FormGroup<T> = FormControl<T> & {
@@ -54,8 +54,10 @@ export const formGroup = <T extends KeyValue<T>>(
   controls: FormControls<T>,
 ): FormGroup<T> => {
   const changeListener = () => {
+    const prevState = formState;
     formState = intoFormState(controlsAsArray);
     formState$.next(formState); // notify changes
+    listeners.forEach(f => f(prevState, formState));
   };
 
   const controlsAsArray = (() => {
@@ -63,15 +65,12 @@ export const formGroup = <T extends KeyValue<T>>(
     type I = [keyof T, FormControl<T[keyof T]>];
     for (const [key, control] of Object.entries(controls) as I[]) {
       arr.push({ key, control });
-      const onChange = control.state$.value.onChange ?? [];
-      control.change(
-        { onChange: [...onChange, changeListener] },
-        { emitEvent: false },
-      );
+      control.addChangeListener(changeListener);
     }
     return arr;
   })();
 
+  let listeners: ChangeListener<T>[] = [];
   let formState = intoFormState(controlsAsArray);
   const formState$ = behaviourSubject(formState);
 
@@ -98,5 +97,7 @@ export const formGroup = <T extends KeyValue<T>>(
       if (config.emitEvent) changeListener();
     },
     controls,
+    addChangeListener: f => (listeners = [...listeners, f]),
+    removeChangeListener: f => (listeners = listeners.filter(i => i !== f)),
   };
 };

@@ -26,18 +26,20 @@ const PrintStreamValue = function <T>({
 const App = () => {
   const group = useMemo(() => {
     return formGroup({
-      str: formControl({ decode: intoString }),
-      requiredStr: formControl({ decode: required(intoString) }),
+      fg: formGroup({
+        str: formControl({ decode: intoString }),
+        requiredStr: formControl({ decode: required(intoString) }),
+      }),
       email: formControl({ decode: intoEmail }),
       num: formControl({ decode: intoNumber, rawValue: 7 }),
     });
   }, []);
   return (
     <div>
-      <InputString label='String' control={group.controls.str} />
+      <InputString label='String' control={group.controls.fg.controls!.str} />
       <InputString
         label='Required String'
-        control={group.controls.requiredStr}
+        control={group.controls.fg.controls!.requiredStr}
       />
       <InputString label='Email' type='email' control={group.controls.email} />
       <InputNumber label='Number' control={group.controls.num} />
