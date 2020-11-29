@@ -12,6 +12,16 @@ import {
   required,
 } from './inputs';
 import { formGroup } from './form/formGroup';
+import { BehaviourSubject } from './form/utils/behaviourSubject';
+
+const PrintStreamValue = function <T>({
+  stream,
+}: {
+  stream: BehaviourSubject<T>;
+}) {
+  const v = useBehaviourSubject(stream);
+  return <pre>{JSON.stringify(v, null, 2)}</pre>;
+};
 
 const App = () => {
   const group = useMemo(() => {
@@ -22,7 +32,6 @@ const App = () => {
       num: formControl({ decode: intoNumber, rawValue: 7 }),
     });
   }, []);
-  const state = useBehaviourSubject(group.state$);
   return (
     <div>
       <InputString label='String' control={group.controls.str} />
@@ -34,7 +43,7 @@ const App = () => {
       <InputNumber label='Number' control={group.controls.num} />
       <div className={css.row}>
         <strong>Form state</strong>
-        <pre>{JSON.stringify(state, null, 2)}</pre>
+        <PrintStreamValue stream={group.state$} />
       </div>
     </div>
   );
