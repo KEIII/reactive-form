@@ -88,9 +88,9 @@ const App = () => {
           onClick={() => {
             const formValue = group.value.current.value;
             if (isRight(formValue)) {
-              console.log(formValue.right);
+              console.info(formValue.right);
             } else {
-              console.log(fmtDecodeError(formValue.left));
+              console.error(fmtDecodeError(formValue.left));
               group.change({ touched: true }, { emit: true });
             }
           }}
