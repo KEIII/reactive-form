@@ -1,8 +1,7 @@
 import React, { useMemo } from 'react';
 import ReactDOM from 'react-dom';
 import css from './style.module.css';
-import { formControl } from './form/formControl';
-import { useBehaviourSubject } from './form/utils/useBehaviourSubject';
+import { FormControl, formControl } from './form/formControl';
 import {
   InputNumber,
   InputString,
@@ -12,31 +11,57 @@ import {
   required,
 } from './inputs';
 import { formGroup } from './form/formGroup';
-import { BehaviourSubject } from './form/utils/behaviourSubject';
-import { isRight } from './form/utils/either';
+import { isRight } from './form/either';
 import { fmtDecodeError } from './form/fmtDecodeError';
+import { FormArray, formArray } from './form/formArray';
+import { useObservable } from './form/observable';
 
-const PrintStreamValue = function <T>({
-  stream,
+const PrintFormState = function <T>({ control }: { control: FormControl<T> }) {
+  const { current } = useObservable(control);
+  return <pre>{JSON.stringify(current, null, 2)}</pre>;
+};
+
+const ArrayControls = function ({
+  formArray,
 }: {
-  stream: BehaviourSubject<T>;
+  formArray: FormArray<string>;
 }) {
-  const v = useBehaviourSubject(stream);
-  return <pre>{JSON.stringify(v, null, 2)}</pre>;
+  const controls = useObservable(formArray.controls);
+  return (
+    <div style={{ margin: '1rem', background: '#eee', padding: '1rem' }}>
+      {controls.map((control, key) => {
+        return (
+          <div key={key} style={{ display: 'flex' }}>
+            <div style={{ flexGrow: 1 }}>
+              <InputString type={'email'} control={control} label={`#${key}`} />
+            </div>
+            <button onClick={() => formArray.remove(control)}>Remove</button>
+          </div>
+        );
+      })}
+      <button onClick={() => formArray.add({ decode: intoEmail })}>Add</button>
+    </div>
+  );
 };
 
 const App = () => {
-  const { group, controls, subControls } = useMemo(() => {
+  const { group, controls, subControls, emails } = useMemo(() => {
     const subControls = {
       str: formControl({ decode: intoString }),
       requiredStr: formControl({ decode: required(intoString) }),
     };
+    const emails = formArray({ decode: intoEmail });
     const controls = {
       sub: formGroup(subControls),
-      email: formControl({ decode: intoEmail }),
+      emails: emails.control,
       num: formControl({ decode: intoNumber, rawValue: 7 }),
     };
-    return { group: formGroup(controls), controls, subControls };
+    return {
+      emails,
+      group: formGroup(controls),
+      controls,
+      subControls,
+    };
   }, []);
   return (
     <div>
@@ -47,41 +72,46 @@ const App = () => {
               {
                 rawValue: {
                   sub: { str: 'str', requiredStr: 'req' },
-                  email: 'email',
+                  emails: ['email1', 'email@2'],
                 },
               },
-              { emitEvent: true },
+              { emit: true },
             );
           }}
         >
           Set data
         </button>
-        <button
-          onClick={() => group.change({ touched: true }, { emitEvent: true })}
-        >
+        <button onClick={() => group.change({ touched: true }, { emit: true })}>
           Touch
         </button>
         <button
           onClick={() => {
-            const v = group.state$.value.value;
-            if (isRight(v)) {
-              console.log(v.right);
+            const formValue = group.value.current.value;
+            if (isRight(formValue)) {
+              console.log(formValue.right);
             } else {
-              console.log(fmtDecodeError(v.left));
-              group.change({ touched: true }, { emitEvent: true });
+              console.log(fmtDecodeError(formValue.left));
+              group.change({ touched: true }, { emit: true });
             }
           }}
         >
           Log Value
         </button>
       </div>
-      <InputString label='String' control={subControls.str} />
-      <InputString label='Required String' control={subControls.requiredStr} />
-      <InputString label='Email' type='email' control={controls.email} />
-      <InputNumber label='Number' control={controls.num} />
-      <div className={css.row}>
-        <strong>Form state</strong>
-        <PrintStreamValue stream={group.state$} />
+      <div style={{ display: 'flex' }}>
+        <div>
+          <InputString label='String' control={subControls.str} />
+          <InputString
+            label='Required String 3'
+            control={subControls.requiredStr}
+          />
+          <InputNumber label='Number' control={controls.num} />
+          <ArrayControls formArray={emails} />
+        </div>
+        <div className={css.row}>
+          <strong>Form state</strong>
+          <PrintFormState control={group} />
+        </div>
       </div>
     </div>
   );

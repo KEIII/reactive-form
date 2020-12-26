@@ -1,9 +1,9 @@
 import { Decode, FormControl } from './form/formControl';
-import { useBehaviourSubject } from './form/utils/useBehaviourSubject';
 import css from './style.module.css';
 import { ChangeEvent } from 'react';
 import { fmtDecodeError } from './form/fmtDecodeError';
-import { isLeft, left, right } from './form/utils/either';
+import { isLeft, left, right } from './form/either';
+import { useObservable } from './form/observable';
 
 export const intoNumber = (v: unknown) => {
   return typeof v === 'number' && Number.isFinite(v)
@@ -47,29 +47,29 @@ const BaseInput = function <T>({
   inputValue,
   getRaw,
 }: Props<T> & BaseProps) {
-  const { value, ...state } = useBehaviourSubject(control.state$);
+  const { current } = useObservable(control);
   return (
     <div className={css.row}>
       <label>
         <div>
           <strong>{label}</strong>
-          {state.touched && isLeft(value) && (
+          {current.touched && isLeft(current.value) && (
             <span style={{ color: 'red', marginLeft: '0.25rem' }}>
-              {fmtDecodeError(value.left)}
+              {fmtDecodeError(current.value.left)}
             </span>
           )}
         </div>
         <input
           type={type}
-          disabled={state.disabled}
-          value={inputValue(state.rawValue)}
+          disabled={current.disabled}
+          value={inputValue(current.rawValue)}
           onChange={event => {
             control.change(
               { dirty: true, rawValue: getRaw(event) },
-              { emitEvent: true },
+              { emit: true },
             );
           }}
-          onBlur={() => control.change({ touched: true }, { emitEvent: true })}
+          onBlur={() => control.change({ touched: true }, { emit: true })}
         />
       </label>
     </div>

@@ -1,15 +1,12 @@
-import { behaviourSubject } from './utils/behaviourSubject';
-import { ChangeListener, DecodeError, FormControl, State } from './formControl';
-import { isRight, left, right } from './utils/either';
-
-type unsafe = any; // eslint-disable-line @typescript-eslint/no-explicit-any
+import { ChangeObserver, DecodeError, FormControl, State } from './formControl';
+import { isRight, left, right } from './either';
 
 type KeyValue<T> = { [P in keyof T]: T[P] };
 
 type KeyControl<T> = [keyof T, FormControl<T[keyof T]>];
 
 const decode = () => {
-  throw new Error('not implemented');
+  throw new Error('formGroup `decode` not implemented');
 };
 
 const intoGroupState = <T>(controlsAsArray: KeyControl<T>[]): State<T> => {
@@ -18,10 +15,10 @@ const intoGroupState = <T>(controlsAsArray: KeyControl<T>[]): State<T> => {
   let disabled = true;
   const errors: { [k: string]: DecodeError } = {};
   let hasError = false;
-  const rawValue = {} as unsafe;
-  const validValue = {} as unsafe;
+  const rawValue = {} as any;
+  const validValue = {} as any;
   for (const [key, control] of controlsAsArray) {
-    const state = control.state$.value;
+    const state = control.value.current;
     rawValue[key] = state.rawValue;
     if (isRight(state.value)) {
       validValue[key] = state.value.right;
@@ -40,11 +37,10 @@ const intoGroupState = <T>(controlsAsArray: KeyControl<T>[]): State<T> => {
 export const formGroup = <T extends KeyValue<T>>(
   controls: { [P in keyof T]: FormControl<T[P]> },
 ): FormControl<T> => {
-  const changeListener = () => {
-    const prevState = groupState;
-    groupState = intoGroupState(controlsAsArray);
-    groupState$.next(groupState); // notify changes
-    listeners.forEach(f => f(prevState, groupState));
+  const notifyChanges = () => {
+    prev = current;
+    current = intoGroupState(controlsAsArray);
+    observers.forEach(observer => observer({ prev, current }));
   };
 
   const controlsAsArray = (() => {
@@ -52,30 +48,35 @@ export const formGroup = <T extends KeyValue<T>>(
     type I = [keyof T, FormControl<T[keyof T]>];
     for (const [key, control] of Object.entries(controls) as I[]) {
       arr.push([key, control]);
-      control.addChangeListener(changeListener);
+      control.subscribe({ next: notifyChanges });
     }
     return arr;
   })();
 
-  let listeners: ChangeListener<T>[] = [];
-  let groupState = intoGroupState(controlsAsArray);
-  const groupState$ = behaviourSubject(groupState);
+  let current = intoGroupState(controlsAsArray);
+  let prev = current;
+  const observers = new Map<symbol, ChangeObserver<T>>();
 
   return {
-    state$: groupState$,
-    change: (groupChanges, config = { emitEvent: false }) => {
-      const { rawValue: _rawValue, decode, ...restChanges } = groupChanges;
+    get value() {
+      return { prev, current };
+    },
+    change: (changes, config = { emit: false }) => {
+      const { rawValue: _rawValue, decode, ...restChanges } = changes;
       const rawValue = (typeof _rawValue === 'object' && _rawValue !== null
         ? _rawValue
         : {}) as Record<keyof T, unknown>;
       for (const [key, control] of controlsAsArray) {
-        const controlChanges = { ...restChanges } as unsafe;
+        const controlChanges = { ...restChanges } as any;
         if (key in rawValue) controlChanges.rawValue = rawValue[key];
         control.change(controlChanges, config);
       }
-      if (config.emitEvent) changeListener();
+      if (config.emit) notifyChanges();
     },
-    addChangeListener: f => (listeners = [...listeners, f]),
-    removeChangeListener: f => (listeners = listeners.filter(i => i !== f)),
+    subscribe: ({ next }) => {
+      const uid = Symbol();
+      observers.set(uid, next);
+      return { unsubscribe: () => observers.delete(uid) };
+    },
   };
 };
