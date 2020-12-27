@@ -15,23 +15,27 @@ const intoGroupState = <T>(controlsAsArray: KeyControl<T>[]): State<T> => {
   let disabled = true;
   const errors: { [k: string]: DecodeError } = {};
   let hasError = false;
-  const rawValue = {} as Record<keyof T, unknown>;
-  const validValue = {} as any; // todo: avoid `any` type
+  const rawValue: { [P in keyof T]?: unknown } = {};
+  const validValue: { [P in keyof T]?: T[P] } = {};
   for (const [key, control] of controlsAsArray) {
     const state = control.value.current;
     rawValue[key] = state.rawValue;
     if (isRight(state.value)) {
       validValue[key] = state.value.right;
     } else {
-      errors[key as string] = state.value.left;
+      errors[String(key)] = state.value.left;
       hasError = true;
     }
     if (!state.disabled) disabled = false;
     if (state.dirty) dirty = true;
     if (state.touched) touched = true;
   }
-  const value = hasError ? left(errors) : right(validValue);
+  const value = hasError ? left(errors) : right(validValue as T);
   return { dirty, disabled, touched, rawValue, decode, value };
+};
+
+const entries = <T extends Record<any, any>>(record: T) => {
+  return Object.entries(record) as [keyof T, T[keyof T]][];
 };
 
 /**
@@ -48,8 +52,7 @@ export const formGroup = <T extends KeyValue<T>>(
 
   const controlsAsArray = (() => {
     const arr: KeyControl<T>[] = [];
-    type I = [keyof T, FormControl<T[keyof T]>];
-    for (const [key, control] of Object.entries(controls) as I[]) {
+    for (const [key, control] of entries(controls)) {
       arr.push([key, control]);
       control.subscribe({ next: notifyChanges });
     }
@@ -66,9 +69,8 @@ export const formGroup = <T extends KeyValue<T>>(
     },
     change: (changes, config = { emit: false }) => {
       const { rawValue: _rawValue, decode, ...restChanges } = changes;
-      const rawValue = (typeof _rawValue === 'object' && _rawValue !== null
-        ? _rawValue
-        : {}) as Record<keyof T, unknown>;
+      const rawValue: { [P in keyof T]?: unknown } =
+        typeof _rawValue === 'object' && _rawValue !== null ? _rawValue : {};
       for (const [key, control] of controlsAsArray) {
         const controlChanges =
           key in rawValue
