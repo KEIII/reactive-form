@@ -26,7 +26,7 @@ const intoArrayState = <T>(
   let disabled = true;
   const errors: { [k: string]: DecodeError } = {};
   let hasError = false;
-  const rawValue = [] as any;
+  const rawValue: unknown[] = [];
   const validValue: T[] = [];
   for (const [idx, control] of controls.entries()) {
     const state = control.value.current;

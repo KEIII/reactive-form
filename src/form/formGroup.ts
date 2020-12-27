@@ -15,8 +15,8 @@ const intoGroupState = <T>(controlsAsArray: KeyControl<T>[]): State<T> => {
   let disabled = true;
   const errors: { [k: string]: DecodeError } = {};
   let hasError = false;
-  const rawValue = {} as any;
-  const validValue = {} as any;
+  const rawValue = {} as Record<keyof T, unknown>;
+  const validValue = {} as any; // todo: avoid `any` type
   for (const [key, control] of controlsAsArray) {
     const state = control.value.current;
     rawValue[key] = state.rawValue;
@@ -34,6 +34,9 @@ const intoGroupState = <T>(controlsAsArray: KeyControl<T>[]): State<T> => {
   return { dirty, disabled, touched, rawValue, decode, value };
 };
 
+/**
+ * todo: missed addControl & removeControl
+ */
 export const formGroup = <T extends KeyValue<T>>(
   controls: { [P in keyof T]: FormControl<T[P]> },
 ): FormControl<T> => {
@@ -67,8 +70,10 @@ export const formGroup = <T extends KeyValue<T>>(
         ? _rawValue
         : {}) as Record<keyof T, unknown>;
       for (const [key, control] of controlsAsArray) {
-        const controlChanges = { ...restChanges } as any;
-        if (key in rawValue) controlChanges.rawValue = rawValue[key];
+        const controlChanges =
+          key in rawValue
+            ? { ...restChanges, rawValue: rawValue[key] }
+            : restChanges;
         control.change(controlChanges, config);
       }
       if (config.emit) notifyChanges();
