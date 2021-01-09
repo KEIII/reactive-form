@@ -34,7 +34,7 @@ const intoGroupState = <T>(controlsAsArray: KeyControl<T>[]): State<T> => {
   return { dirty, disabled, touched, rawValue, decode, value };
 };
 
-const entries = <T extends Record<any, any>>(record: T) => {
+const entries = <T extends KeyValue<T>>(record: T) => {
   return Object.entries(record) as [keyof T, T[keyof T]][];
 };
 
