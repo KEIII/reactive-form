@@ -6,6 +6,7 @@ import {
   FormControl,
   InitState,
   State,
+  StateDiff,
 } from './formControl';
 import { Observable, Unsubscribable } from './observable';
 import { isLeft, isRight, left, right } from './either';
@@ -109,20 +110,39 @@ export const formArray = <T>({
       return right(v);
     };
 
-    const notifyChanges = () => {
-      prev = current;
-      current = intoArrayState(decodeArr, controls.value);
-      observers.forEach(observer => observer({ prev, current }));
+    const onChanges = () => {
+      stateHolder.invalidate();
+      if (observers.size > 0) {
+        const diff = stateHolder.get();
+        observers.forEach(observer => observer(diff));
+      }
     };
 
-    let current = intoArrayState<T>(decodeArr, controls.value);
-    let prev = current;
+    const stateHolder = (() => {
+      type StateHolder =
+        | { valid: true; diff: StateDiff<T[]> }
+        | { valid: false; diff: StateDiff<T[]> | null };
+      let h: StateHolder = { valid: false, diff: null };
+      return {
+        invalidate: () => {
+          h = { valid: false, diff: h.diff };
+        },
+        get: () => {
+          if (!h.valid) {
+            const current = intoArrayState<T>(decodeArr, controls.value);
+            const prev = h.diff?.current ?? current;
+            h = { valid: true, diff: { prev, current } };
+          }
+          return h.diff;
+        },
+      };
+    })();
 
     const observers = new Map<symbol, ChangeObserver<T[]>>();
 
     const control: FormControl<T[]> = {
       get value() {
-        return { prev, current };
+        return stateHolder.get();
       },
       change: (arrayChanges, config = { emit: false }) => {
         const { rawValue: _rawValue, decode, ...restChanges } = arrayChanges;
@@ -135,7 +155,7 @@ export const formArray = <T>({
             add({ rawValue, ...restChanges });
           }
         }
-        if (config.emit) notifyChanges();
+        if (config.emit) onChanges();
       },
       subscribe: ({ next }) => {
         const uid = Symbol();
@@ -144,7 +164,7 @@ export const formArray = <T>({
       },
     };
 
-    return { control, notifyChanges };
+    return { control, notifyChanges: onChanges };
   })();
 
   return {

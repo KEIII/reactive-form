@@ -1,4 +1,10 @@
-import { ChangeObserver, DecodeError, FormControl, State } from './formControl';
+import {
+  ChangeObserver,
+  DecodeError,
+  FormControl,
+  State,
+  StateDiff,
+} from './formControl';
 import { isRight, left, right } from './either';
 
 type KeyValue<T> = { [P in keyof T]: T[P] };
@@ -38,34 +44,51 @@ const entries = <T extends KeyValue<T>>(record: T) => {
   return Object.entries(record) as [keyof T, T[keyof T]][];
 };
 
-/**
- * todo: missed addControl & removeControl
- */
 export const formGroup = <T extends KeyValue<T>>(
   controls: { [P in keyof T]: FormControl<T[P]> },
 ): FormControl<T> => {
-  const notifyChanges = () => {
-    prev = current;
-    current = intoGroupState(controlsAsArray);
-    observers.forEach(observer => observer({ prev, current }));
+  const onChanges = () => {
+    stateHolder.invalidate();
+    if (observers.size > 0) {
+      const diff = stateHolder.get();
+      observers.forEach(observer => observer(diff));
+    }
   };
 
   const controlsAsArray = (() => {
     const arr: KeyControl<T>[] = [];
     for (const [key, control] of entries(controls)) {
       arr.push([key, control]);
-      control.subscribe({ next: notifyChanges });
+      control.subscribe({ next: onChanges });
     }
     return arr;
   })();
 
-  let current = intoGroupState(controlsAsArray);
-  let prev = current;
+  const stateHolder = (() => {
+    type StateHolder =
+      | { valid: true; diff: StateDiff<T> }
+      | { valid: false; diff: StateDiff<T> | null };
+    let h: StateHolder = { valid: false, diff: null };
+    return {
+      invalidate: () => {
+        h = { valid: false, diff: h.diff };
+      },
+      get: () => {
+        if (!h.valid) {
+          const current = intoGroupState(controlsAsArray);
+          const prev = h.diff?.current ?? current;
+          h = { valid: true, diff: { prev, current } };
+        }
+        return h.diff;
+      },
+    };
+  })();
+
   const observers = new Map<symbol, ChangeObserver<T>>();
 
   return {
     get value() {
-      return { prev, current };
+      return stateHolder.get();
     },
     change: (changes, config = { emit: false }) => {
       const { rawValue: _rawValue, decode, ...restChanges } = changes;
@@ -78,7 +101,7 @@ export const formGroup = <T extends KeyValue<T>>(
             : restChanges;
         control.change(controlChanges, config);
       }
-      if (config.emit) notifyChanges();
+      if (config.emit) onChanges();
     },
     subscribe: ({ next }) => {
       const uid = Symbol();
